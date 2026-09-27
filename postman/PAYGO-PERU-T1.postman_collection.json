@@ -1,0 +1,260 @@
+{
+  "info": {
+    "_postman_id": "8b1f3c2e-5a4d-4e6f-9a7b-1c2d3e4f5a60",
+    "name": "PAYGO PERU - T1 (Tarjetas / Recargas / Riesgo)",
+    "description": "Pregunta 1: ms-tarjetas + ms-recargas (OpenFeign).\nPregunta 2: ms-recargas publica en Yupanqui_Queue (RabbitMQ) y ms-riesgo consume y registra en la tabla analisis.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "tarjetasBaseUrl", "value": "http://localhost:8081" },
+    { "key": "recargasBaseUrl", "value": "http://localhost:8082" },
+    { "key": "riesgoBaseUrl", "value": "http://localhost:8083" },
+    { "key": "idTarjeta", "value": "1" }
+  ],
+  "item": [
+    {
+      "name": "Pregunta 1 - ms-tarjetas",
+      "item": [
+        {
+          "name": "Registrar tarjeta",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Tarjeta registrada\", function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "pm.collectionVariables.set(\"idTarjeta\", pm.response.json().idTarjeta);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nomTitular\": \"Rosa Quispe\",\n  \"saldoAsignado\": 800.00,\n  \"saldoDisponible\": 600.00\n}"
+            },
+            "url": {
+              "raw": "{{tarjetasBaseUrl}}/tarjetas",
+              "host": ["{{tarjetasBaseUrl}}"],
+              "path": ["tarjetas"]
+            }
+          }
+        },
+        {
+          "name": "Listar tarjetas",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200 y lista\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json()).to.be.an(\"array\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{tarjetasBaseUrl}}/tarjetas",
+              "host": ["{{tarjetasBaseUrl}}"],
+              "path": ["tarjetas"]
+            }
+          }
+        },
+        {
+          "name": "Consultar tarjeta por id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{tarjetasBaseUrl}}/tarjetas/{{idTarjeta}}",
+              "host": ["{{tarjetasBaseUrl}}"],
+              "path": ["tarjetas", "{{idTarjeta}}"]
+            }
+          }
+        },
+        {
+          "name": "Consultar tarjeta inexistente (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", function () {",
+                  "  pm.response.to.have.status(404);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{tarjetasBaseUrl}}/tarjetas/999",
+              "host": ["{{tarjetasBaseUrl}}"],
+              "path": ["tarjetas", "999"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Pregunta 1 y 2 - ms-recargas",
+      "item": [
+        {
+          "name": "Registrar recarga APROBADA (tarjeta 1: 500 <= 70% de 1000)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Recarga registrada con saldo de ms-tarjetas\", function () {",
+                  "  pm.response.to.have.status(201);",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.saldoDisponible).to.eql(1000.00);",
+                  "  pm.expect(b.fechaRecarga).to.be.a(\"string\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idTarjeta\": 1,\n  \"montoRecarga\": 500.00\n}"
+            },
+            "url": {
+              "raw": "{{recargasBaseUrl}}/recargas",
+              "host": ["{{recargasBaseUrl}}"],
+              "path": ["recargas"]
+            }
+          }
+        },
+        {
+          "name": "Registrar recarga OBSERVADA (tarjeta 2: 300 > 70% de 350)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idTarjeta\": 2,\n  \"montoRecarga\": 300.00\n}"
+            },
+            "url": {
+              "raw": "{{recargasBaseUrl}}/recargas",
+              "host": ["{{recargasBaseUrl}}"],
+              "path": ["recargas"]
+            }
+          }
+        },
+        {
+          "name": "Registrar recarga con tarjeta inexistente (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404 - no se registra\", function () {",
+                  "  pm.response.to.have.status(404);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idTarjeta\": 999,\n  \"montoRecarga\": 100.00\n}"
+            },
+            "url": {
+              "raw": "{{recargasBaseUrl}}/recargas",
+              "host": ["{{recargasBaseUrl}}"],
+              "path": ["recargas"]
+            }
+          }
+        },
+        {
+          "name": "Listar recargas",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{recargasBaseUrl}}/recargas",
+              "host": ["{{recargasBaseUrl}}"],
+              "path": ["recargas"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Pregunta 2 - ms-riesgo",
+      "item": [
+        {
+          "name": "Listar analisis",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200 y situaciones validas\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.response.json().forEach(a => pm.expect(a.situacion).to.be.oneOf([\"Aprobada\", \"Observada\"]));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{riesgoBaseUrl}}/analisis",
+              "host": ["{{riesgoBaseUrl}}"],
+              "path": ["analisis"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
